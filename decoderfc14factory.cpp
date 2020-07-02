@@ -37,25 +37,26 @@ DecoderProperties DecoderFC14Factory::properties() const
     return properties;
 }
 
-Decoder *DecoderFC14Factory::create(const QString &path, QIODevice *)
+Decoder *DecoderFC14Factory::create(const QString &path, QIODevice *input)
 {
+    Q_UNUSED(input);
     return new DecoderFC14(path);
 }
 
-QList<TrackInfo *> DecoderFC14Factory::createPlayList(const QString &path, TrackInfo::Parts parts, QStringList *)
+QList<TrackInfo*> DecoderFC14Factory::createPlayList(const QString &path, TrackInfo::Parts parts, QStringList *)
 {
     TrackInfo *info = new TrackInfo(path);
 
-    if(parts == TrackInfo::NoParts)
+    if(parts == TrackInfo::Parts())
     {
-        return QList<TrackInfo *>() << info;
+        return QList<TrackInfo*>() << info;
     }
 
     FC14Helper helper(path);
     if(!helper.initialize())
     {
         delete info;
-        return QList<TrackInfo *>();
+        return QList<TrackInfo*>();
     }
 
     if(parts & TrackInfo::Properties)
@@ -64,13 +65,16 @@ QList<TrackInfo *> DecoderFC14Factory::createPlayList(const QString &path, Track
         info->setValue(Qmmp::SAMPLERATE, helper.samplerate());
         info->setValue(Qmmp::CHANNELS, helper.channels());
         info->setValue(Qmmp::BITS_PER_SAMPLE, helper.bitsPerSample());
+        info->setValue(Qmmp::FORMAT_NAME, "fc14");
         info->setDuration(helper.totalTime());
     }
 
-    return QList<TrackInfo *>() << info;
+    return QList<TrackInfo*>() << info;
 }
 
-MetaDataModel* DecoderFC14Factory::createMetaDataModel(const QString &, bool)
+MetaDataModel* DecoderFC14Factory::createMetaDataModel(const QString &path, bool readOnly)
 {
+    Q_UNUSED(path);
+    Q_UNUSED(readOnly);
     return nullptr;
 }
