@@ -1,6 +1,6 @@
 /* =================================================
  * This file is part of the TTK qmmp plugin project
- * Copyright (C) 2015 - 2020 Greedysky Studio
+ * Copyright (C) 2015 - 2021 Greedysky Studio
 
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -40,8 +40,8 @@ typedef struct {
 class FC14Helper
 {
 public:
-    FC14Helper(const QString &path);
-    virtual ~FC14Helper();
+    explicit FC14Helper(const QString &path);
+    ~FC14Helper();
 
     void close();
 
@@ -50,7 +50,7 @@ public:
     void seek(qint64 time);
 
     int bitrate() const;
-    int samplerate() const;
+    int sampleRate() const;
     int channels() const;
     int bitsPerSample() const;
 
@@ -60,6 +60,7 @@ public:
 private:
     QString m_path;
     fc14_info_t *m_info;
+
 };
 
 #endif

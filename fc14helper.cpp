@@ -1,26 +1,8 @@
-/* =================================================
- * This file is part of the TTK qmmp plugin project
- * Copyright (C) 2015 - 2020 Greedysky Studio
-
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3 of the License, or
- * (at your option) any later version.
-
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
-
- * You should have received a copy of the GNU General Public License along
- * with this program; If not, see <http://www.gnu.org/licenses/>.
- ================================================= */
-
 #include "fc14helper.h"
 
 FC14Helper::FC14Helper(const QString &path)
+    : m_path(path)
 {
-    m_path = path;
     m_info = (fc14_info_t*)calloc(sizeof(fc14_info_t), 1);
 }
 
@@ -43,36 +25,43 @@ void FC14Helper::close()
 
 bool FC14Helper::initialize()
 {
-    m_info->fc = fc14dec_new();
-    FILE *file = stdio_open(m_path.toLocal8Bit().constData());
+    FILE *file = stdio_open(qPrintable(m_path));
     if(!file)
     {
+        qWarning("FC14Helper: open file failed");
         return false;
     }
 
     int size = stdio_length(file);
     if(size <= 0 || size > 256 * 1024)
     {
+        qWarning("FC14Helper: file size invalid");
+        stdio_close(file);
         return false;
     }
 
     unsigned char *module = (unsigned char *)malloc(size);
     if(!module)
     {
+        qWarning("FC14Helper: file data read error");
+        stdio_close(file);
         return false;
     }
 
     stdio_read(module, size, 1, file);
     stdio_close(file);
 
+    m_info->fc = fc14dec_new();
     if(!fc14dec_detect(m_info->fc, module, size))
     {
+        qWarning("FC14Helper: fc14dec_detect error");
         free(module);
         return false;
     }
 
     if(!fc14dec_init(m_info->fc, module, size))
     {
+        qWarning("FC14Helper: fc14dec_init error");
         free(module);
         return false;
     }
@@ -87,7 +76,7 @@ bool FC14Helper::initialize()
     m_info->channels = 2;
     m_info->sample_rate = 44100;
     m_info->bits_per_sample = 16;
-    m_info->bitrate = size * 8.0 / m_info->length;
+    m_info->bitrate = size * 8.0 / m_info->length + 1.0f;
 
     return true;
 }
@@ -107,7 +96,7 @@ int FC14Helper::bitrate() const
     return m_info->bitrate;
 }
 
-int FC14Helper::samplerate() const
+int FC14Helper::sampleRate() const
 {
     return m_info->sample_rate;
 }
