@@ -27,12 +27,8 @@ extern "C" {
 
 typedef struct {
     void *fc;
-    int sample_rate;
-    int length;
     int bitrate;
-    int bits_per_sample;
-    int channels;
-} fc14_info_t;
+} fc14_info;
 
 /*!
  * @author Greedysky <greedysky@163.com>
@@ -60,7 +56,7 @@ public:
 
 private:
     QString m_path;
-    fc14_info_t *m_info;
+    fc14_info *m_info;
 
 };
 

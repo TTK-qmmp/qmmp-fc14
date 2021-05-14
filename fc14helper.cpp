@@ -3,7 +3,7 @@
 FC14Helper::FC14Helper(const QString &path)
     : m_path(path)
 {
-    m_info = (fc14_info_t*)calloc(sizeof(fc14_info_t), 1);
+    m_info = (fc14_info*)calloc(sizeof(fc14_info), 1);
 }
 
 FC14Helper::~FC14Helper()
@@ -67,23 +67,19 @@ bool FC14Helper::initialize()
     }
     free(module);
 
-    m_info->channels = 2;
-    m_info->sample_rate = 44100;
-    m_info->bits_per_sample = 16;
     // Initialize decoder's audio sample mixer.  frequency : output sample frequency
     // precision : bits per sample  channels : 1=mono, 2=stereo
     // zero : value of silent output sample (e.g. 0x80 for unsigned 8-bit, 0x0000 for signed 16-bit)
-    fc14dec_mixer_init(m_info->fc, m_info->sample_rate, m_info->bits_per_sample, m_info->channels, 0x0000);
+    fc14dec_mixer_init(m_info->fc, sampleRate(), bitsPerSample(), channels(), 0x0000);
 
-    m_info->length = fc14dec_duration(m_info->fc);
-    m_info->bitrate = size * 8.0 / m_info->length + 1.0f;
+    m_info->bitrate = size * 8.0 / totalTime() + 1.0f;
 
     return true;
 }
 
 int FC14Helper::totalTime() const
 {
-    return m_info->length;
+    return fc14dec_duration(m_info->fc);
 }
 
 void FC14Helper::seek(qint64 time)
@@ -98,17 +94,17 @@ int FC14Helper::bitrate() const
 
 int FC14Helper::sampleRate() const
 {
-    return m_info->sample_rate;
+    return 44100;
 }
 
 int FC14Helper::channels() const
 {
-    return m_info->channels;
+    return 2;
 }
 
 int FC14Helper::bitsPerSample() const
 {
-    return m_info->bits_per_sample;
+    return 16;
 }
 
 int FC14Helper::read(unsigned char *buf, int size)
