@@ -28,7 +28,7 @@ bool FC14Helper::initialize()
     QFile file(m_path);
     if(!file.open(QFile::ReadOnly))
     {
-        qWarning("AsapHelper: open file failed");
+        qWarning("FC14Helper: open file failed");
         return false;
     }
 
