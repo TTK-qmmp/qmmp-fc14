@@ -20,16 +20,16 @@
 #define FC14HELPER_H
 
 extern "C" {
-#include "fc14audiodecoder.h"
+#include <libfc14/fc14audiodecoder.h>
 }
 #include <QMap>
 #include <QFile>
 #include <qmmp/qmmp.h>
 
 typedef struct {
-    void *fc;
+    void *input;
     int bitrate;
-} fc14_info;
+} decode_info;
 
 /*!
  * @author Greedysky <greedysky@163.com>
@@ -56,7 +56,7 @@ public:
 
 private:
     QString m_path;
-    fc14_info *m_info;
+    decode_info *m_info;
 
 };
 
