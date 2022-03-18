@@ -12,11 +12,10 @@ bool DecoderFC14Factory::canDecode(QIODevice *) const
 DecoderProperties DecoderFC14Factory::properties() const
 {
     DecoderProperties properties;
-    properties.name = "FC14 Plugin";
+    properties.name = tr("FC14 Plugin");
+    properties.shortName = "fc14";
     properties.filters << "*.fc" << "*.fc13" << "*.fc14" << "*.smod";
     properties.description = "Future Composer Audio File";
-    properties.shortName = "fc14";
-    properties.protocols << "file";
     properties.noInput = true;
     return properties;
 }
@@ -30,7 +29,6 @@ Decoder *DecoderFC14Factory::create(const QString &path, QIODevice *input)
 QList<TrackInfo*> DecoderFC14Factory::createPlayList(const QString &path, TrackInfo::Parts parts, QStringList *)
 {
     TrackInfo *info = new TrackInfo(path);
-
     if(parts == TrackInfo::Parts())
     {
         return QList<TrackInfo*>() << info;
@@ -57,11 +55,10 @@ QList<TrackInfo*> DecoderFC14Factory::createPlayList(const QString &path, TrackI
         info->setValue(Qmmp::BITRATE, helper.bitrate());
         info->setValue(Qmmp::SAMPLERATE, helper.sampleRate());
         info->setValue(Qmmp::CHANNELS, helper.channels());
-        info->setValue(Qmmp::BITS_PER_SAMPLE, helper.bitsPerSample());
+        info->setValue(Qmmp::BITS_PER_SAMPLE, helper.depth());
         info->setValue(Qmmp::FORMAT_NAME, "FC14");
         info->setDuration(helper.totalTime());
     }
-
     return QList<TrackInfo*>() << info;
 }
 
