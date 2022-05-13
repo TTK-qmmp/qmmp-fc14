@@ -16,8 +16,8 @@
 
 #include "FC.h"
 
-const std::string FC::SMOD_FORMAT_NAME = "FC";
-const std::string FC::FC14_FORMAT_NAME = "FC 1.4";
+const std::string FC::SMOD_FORMAT_NAME = "Future Composer 1.0 - 1.3 (AMIGA)";
+const std::string FC::FC14_FORMAT_NAME = "Future Composer 1.4 (AMIGA)";
 const std::string FC::UNKNOWN_FORMAT_NAME = "unknown format";
 
 const ubyte FC::silenceData[8] = {

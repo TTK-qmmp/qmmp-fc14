@@ -145,6 +145,7 @@ void LamePaulaMixer::init(udword freq, ubyte bits, ubyte channels, uword zero)
 void LamePaulaMixer::setReplayingSpeed() {
     samples = ( samplesOrg = _pcmFreq / 50 );
     samplesPnt = (( _pcmFreq % 50 ) * 65536 ) / 50;  
+    samplesAdd = 0;
 }
 
 
@@ -152,6 +153,7 @@ void LamePaulaMixer::setBpm(uword bpm) {
     uword callsPerSecond = (bpm * 2) / 5;
     samples = ( samplesOrg = _pcmFreq / callsPerSecond );
     samplesPnt = (( _pcmFreq % callsPerSecond ) * 65536 ) / callsPerSecond;  
+    samplesAdd = 0; 
 }
 
 

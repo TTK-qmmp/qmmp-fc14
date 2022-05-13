@@ -22,9 +22,7 @@
 #include <QMap>
 #include <QFile>
 #include <qmmp/qmmp.h>
-extern "C" {
 #include <libfc14/fc14audiodecoder.h>
-}
 
 /*!
  * @author Greedysky <greedysky@163.com>
@@ -41,18 +39,18 @@ public:
     inline void seek(qint64 time) { fc14dec_seek(m_input, time); }
     inline qint64 totalTime() const { return fc14dec_duration(m_input); }
 
-    inline int bitrate() const { return m_bitrate; }
+    inline int bitrate() const { return 8; }
     inline int sampleRate() const { return 44100; }
     inline int channels() const { return 2; }
     inline int depth() const { return 16; }
 
     qint64 read(unsigned char *data, qint64 maxSize);
-    QMap<Qmmp::MetaData, QString> readMetaData() const;
+
+    inline QString comment() const { return fc14dec_format_name(m_input); }
 
 private:
     QString m_path;
     void *m_input = nullptr;
-    int m_bitrate = 0;
 
 };
 

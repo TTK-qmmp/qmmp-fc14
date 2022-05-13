@@ -6,7 +6,6 @@
 #ifndef MYENDIAN_H
 #define MYENDIAN_H
 
-//#include "Config.h"
 #include "MyTypes.h"
 
 // This should never be true.

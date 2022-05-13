@@ -29,7 +29,8 @@ bool FC14Helper::initialize()
     }
 
     const qint64 size = file.size();
-    const QByteArray module = file.readAll();
+    const QByteArray &module = file.readAll();
+    file.close();
 
     m_input = fc14dec_new();
     if(!fc14dec_detect(m_input, (void*)module.constData(), size))
@@ -48,7 +49,6 @@ bool FC14Helper::initialize()
     // precision : bits per sample  channels : 1=mono, 2=stereo
     // zero : value of silent output sample (e.g. 0x80 for unsigned 8-bit, 0x0000 for signed 16-bit)
     fc14dec_mixer_init(m_input, sampleRate(), depth(), channels(), 0x0000);
-    m_bitrate = size * 8.0 / totalTime() + 1.0f;
     return true;
 }
 
@@ -56,11 +56,4 @@ qint64 FC14Helper::read(unsigned char *data, qint64 maxSize)
 {
     fc14dec_buffer_fill(m_input, data, maxSize);
     return fc14dec_song_end(m_input) ? 0 : maxSize;
-}
-
-QMap<Qmmp::MetaData, QString> FC14Helper::readMetaData() const
-{
-    QMap<Qmmp::MetaData, QString> metaData;
-    metaData.insert(Qmmp::COMMENT, fc14dec_format_name(m_input));
-    return metaData;
 }
