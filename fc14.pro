@@ -22,5 +22,4 @@ INCLUDEPATH += $$PWD/libfc14
 unix {
     target.path = $$PLUGIN_DIR/Input
     INSTALLS += target
-    QMAKE_CLEAN = $$PLUGINS_PREFIX/Input/libfc14.so
 }
