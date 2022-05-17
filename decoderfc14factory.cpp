@@ -80,9 +80,9 @@ void DecoderFC14Factory::showSettings(QWidget *parent)
 
 void DecoderFC14Factory::showAbout(QWidget *parent)
 {
-    QMessageBox::about (parent, tr("About FC14 Reader Plugin"),
-                        tr("Qmmp FC14 Reader Plugin")+"\n"+
-                        tr("Written by: Greedysky <greedysky@163.com>"));
+    QMessageBox::about(parent, tr("About FC14 Reader Plugin"),
+                       tr("Qmmp FC14 Reader Plugin") + "\n" +
+                       tr("Written by: Greedysky <greedysky@163.com>"));
 }
 
 QString DecoderFC14Factory::translation() const
