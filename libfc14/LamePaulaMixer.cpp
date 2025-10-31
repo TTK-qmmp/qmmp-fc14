@@ -22,21 +22,15 @@ LamePaulaMixer::LamePaulaMixer()
     _voices = 0;
     for (ubyte v=0; v<_maxVoices; v++) {
         _voice[v] = 0;
+#ifdef FC_API_EXT_1
+        _muted[v] = false;
+#endif
     }
-
-	samplesAdd = 0;
-	bufferScale = 0;
-	toFill = 0;
-	_fillFunc = 0;
 }
 
 
 LamePaulaMixer::~LamePaulaMixer() {
     end();
-	samplesAdd = 0;
-	bufferScale = 0;
-	toFill = 0;
-	_fillFunc = 0;
 }
 
 
@@ -44,9 +38,31 @@ void LamePaulaMixer::end() {
     for (ubyte v=0; v<_voices; v++) {
         delete _voice[v];
         _voice[v] = 0;
+#ifdef FC_API_EXT_1
+        _muted[v] = false;
+#endif
     }
     _voices = 0;
 }
+
+
+#ifdef FC_API_EXT_1
+void LamePaulaMixer::mute(ubyte v, bool mute) {
+    if (v < _maxVoices) {
+        _muted[v] = mute;
+    }
+}
+
+
+bool LamePaulaMixer::isMuted(ubyte v) {
+    if (v < _maxVoices) {
+        return _muted[v];
+    }
+    else {
+        return 0;
+    }
+}
+#endif
 
 
 PaulaVoice* LamePaulaMixer::getVoice(ubyte n) {
@@ -79,6 +95,9 @@ void LamePaulaMixer::init(ubyte voices) {
         pv->stepSpeedPnt = 0;
         pv->stepSpeedAddPnt = 0;
         pv->off();
+#ifdef FC_API_EXT_1
+        _muted[v] = false;
+#endif
     }
 }
 
@@ -91,6 +110,9 @@ void LamePaulaMixer::init(udword freq, ubyte bits, ubyte channels, uword zero)
     _zero = zero;
 
     setReplayingSpeed();
+
+    bufferScale = 0;
+    toFill = 0;
     
     if (bits == 8) {
         zero8bit = zero;
@@ -114,11 +136,14 @@ void LamePaulaMixer::init(udword freq, ubyte bits, ubyte channels, uword zero)
         }
     }
     
-	uword ui = 0;
-    long si = 0;
+	uword ui;
+    long si;
 	ubyte voicesPerChannel = _voices/_channels;
+
     // Input samples: 80,81,82,...,FE,FF,00,01,02,...,7E,7F
     // Array: 00/x, 01/x, 02/x,...,7E/x,7F/x,80/x,81/x,82/x,...,FE/x/,FF/x 
+    ui = 0;
+    si = 0;
     while (si++ < 128) {
 		mix8[ui++] = (sbyte)(si/voicesPerChannel);
     }
@@ -204,6 +229,12 @@ void* LamePaulaMixer::fill8bitMono(void* buffer, udword numberOfSamples)
     for (ubyte v=0; v<_voices; v++) {
         buffer8bit = static_cast<ubyte*>(buffer);
         LamePaulaVoice *pv = _voice[v];
+        uword vol = pv->paula.volume;
+#ifdef FC_API_EXT_1
+        if ( _muted[v] ) {
+            vol = 0;
+        }
+#endif
         for (udword n = numberOfSamples; n>0; n--) {
             if (v == 0) {
                 *buffer8bit = zero8bit;
@@ -212,14 +243,14 @@ void* LamePaulaMixer::fill8bitMono(void* buffer, udword numberOfSamples)
             pv->start += ( pv->stepSpeed + ( pv->stepSpeedAddPnt > 65535 ) );
             pv->stepSpeedAddPnt &= 65535;
             if ( pv->start < pv->end ) {
-                *buffer8bit += ( pv->paula.volume * mix8[*pv->start] ) >> 6;
+                *buffer8bit += ( vol * mix8[*pv->start] ) >> 6;
             }
             else {
                 if ( pv->looping ) {
                     pv->start = pv->repeatStart;
                     pv->end = pv->repeatEnd;
                     if ( pv->start < pv->end ) {
-                        *buffer8bit += ( pv->paula.volume * mix8[*pv->start] ) >> 6;
+                        *buffer8bit += ( vol * mix8[*pv->start] ) >> 6;
                     }
                 }
             }
@@ -237,6 +268,12 @@ void* LamePaulaMixer::fill8bitStereo( void* buffer, udword numberOfSamples )
     {
         buffer8bit = (static_cast<ubyte*>(buffer))+1;
         LamePaulaVoice *pv = _voice[v];
+        uword vol = pv->paula.volume;
+#ifdef FC_API_EXT_1
+        if ( _muted[v] ) {
+            vol = 0;
+        }
+#endif
         for (udword n = numberOfSamples; n>0; n--) {
             if (v == 1) {
                 *buffer8bit = zero8bit;
@@ -245,14 +282,14 @@ void* LamePaulaMixer::fill8bitStereo( void* buffer, udword numberOfSamples )
             pv->start += ( pv->stepSpeed + ( pv->stepSpeedAddPnt > 65535 ) );
             pv->stepSpeedAddPnt &= 65535;
             if ( pv->start < pv->end ) {
-                *buffer8bit += ( pv->paula.volume * mix8[*pv->start] ) >> 6;
+                *buffer8bit += ( vol * mix8[*pv->start] ) >> 6;
             }
             else {
                 if ( pv->looping ) {
                     pv->start = pv->repeatStart;
                     pv->end = pv->repeatEnd;
                     if ( pv->start < pv->end ) {
-                        *buffer8bit += ( pv->paula.volume * mix8[*pv->start] ) >> 6;
+                        *buffer8bit += ( vol * mix8[*pv->start] ) >> 6;
                     }
                 }
             }
@@ -263,6 +300,12 @@ void* LamePaulaMixer::fill8bitStereo( void* buffer, udword numberOfSamples )
     for (ubyte v=0; v<_voices; v+=2) {
         buffer8bit = static_cast<ubyte*>(buffer);
         LamePaulaVoice *pv = _voice[v];
+        uword vol = pv->paula.volume;
+#ifdef FC_API_EXT_1
+        if ( _muted[v] ) {
+            vol = 0;
+        }
+#endif
         for (udword n = numberOfSamples; n>0; n--) {
             if (v == 0) {
                 *buffer8bit = zero8bit;
@@ -271,14 +314,14 @@ void* LamePaulaMixer::fill8bitStereo( void* buffer, udword numberOfSamples )
             pv->start += ( pv->stepSpeed + ( pv->stepSpeedAddPnt > 65535 ) );
             pv->stepSpeedAddPnt &= 65535;
             if ( pv->start < pv->end ) {
-                *buffer8bit += ( pv->paula.volume * mix8[*pv->start] ) >> 6;
+                *buffer8bit += ( vol * mix8[*pv->start] ) >> 6;
             }
             else {
                 if ( pv->looping ) {
                     pv->start = pv->repeatStart;
                     pv->end = pv->repeatEnd;
                     if ( pv->start < pv->end ) {
-                        *buffer8bit += ( pv->paula.volume * mix8[*pv->start] ) >> 6;
+                        *buffer8bit += ( vol * mix8[*pv->start] ) >> 6;
                     }
                 }
             }
@@ -295,6 +338,12 @@ void* LamePaulaMixer::fill16bitMono( void* buffer, udword numberOfSamples )
     for (ubyte v=0; v<_voices; v++) {
         buffer16bit = static_cast<sword*>(buffer);
         LamePaulaVoice *pv = _voice[v];
+        uword vol = pv->paula.volume;
+#ifdef FC_API_EXT_1
+        if ( _muted[v] ) {
+            vol = 0;
+        }
+#endif
         for (udword n = numberOfSamples; n>0; n--) {
             if (v == 0) {
                 *buffer16bit = zero16bit;
@@ -303,14 +352,14 @@ void* LamePaulaMixer::fill16bitMono( void* buffer, udword numberOfSamples )
             pv->start += ( pv->stepSpeed + ( pv->stepSpeedAddPnt > 65535 ) );
             pv->stepSpeedAddPnt &= 65535;
             if ( pv->start < pv->end ) {
-                *buffer16bit += ( pv->paula.volume * mix16[*pv->start] ) >> 6;
+                *buffer16bit += ( vol * mix16[*pv->start] ) >> 6;
             }
             else {
                 if ( pv->looping ) {
                     pv->start = pv->repeatStart;
                     pv->end = pv->repeatEnd;
                     if ( pv->start < pv->end ) {
-                        *buffer16bit += ( pv->paula.volume * mix16[*pv->start] ) >> 6;
+                        *buffer16bit += ( vol * mix16[*pv->start] ) >> 6;
                     }
                 }
             }
@@ -327,6 +376,12 @@ void* LamePaulaMixer::fill16bitStereo( void *buffer, udword numberOfSamples )
     for (ubyte v=1; v<_voices; v+=2 ) {
         buffer16bit = (static_cast<sword*>(buffer))+1;
         LamePaulaVoice *pv = _voice[v];
+        uword vol = pv->paula.volume;
+#ifdef FC_API_EXT_1
+        if ( _muted[v] ) {
+            vol = 0;
+        }
+#endif
         for (udword n = numberOfSamples; n>0; n--) {
             if (v == 1) {
                 *buffer16bit = zero16bit;
@@ -335,7 +390,7 @@ void* LamePaulaMixer::fill16bitStereo( void *buffer, udword numberOfSamples )
             pv->start += ( pv->stepSpeed + ( pv->stepSpeedAddPnt > 65535 ) );
             pv->stepSpeedAddPnt &= 65535;
             if ( pv->start < pv->end ) {
-                *buffer16bit += ( pv->paula.volume * mix16[*pv->start] ) >> 6;
+                *buffer16bit += ( vol * mix16[*pv->start] ) >> 6;
             }
             else {
                 if ( pv->looping ) {
@@ -343,7 +398,7 @@ void* LamePaulaMixer::fill16bitStereo( void *buffer, udword numberOfSamples )
                     pv->end = pv->repeatEnd;
                     if ( pv->start < pv->end )
                     {
-                        *buffer16bit += ( pv->paula.volume * mix16[*pv->start] ) >> 6;
+                        *buffer16bit += ( vol * mix16[*pv->start] ) >> 6;
                     }
                 }
             }
@@ -354,6 +409,12 @@ void* LamePaulaMixer::fill16bitStereo( void *buffer, udword numberOfSamples )
     for (ubyte v=0; v<_voices; v+=2 ) {
         buffer16bit = static_cast<sword*>(buffer);
         LamePaulaVoice *pv = _voice[v];
+        uword vol = pv->paula.volume;
+#ifdef FC_API_EXT_1
+        if ( _muted[v] ) {
+            vol = 0;
+        }
+#endif
         for (udword n = numberOfSamples; n>0; n--) {
             if (v == 0) {
                 *buffer16bit = zero16bit;
@@ -362,14 +423,14 @@ void* LamePaulaMixer::fill16bitStereo( void *buffer, udword numberOfSamples )
             pv->start += ( pv->stepSpeed + ( pv->stepSpeedAddPnt > 65535 ) );
             pv->stepSpeedAddPnt &= 65535;
             if ( pv->start < pv->end ) {
-                *buffer16bit += ( pv->paula.volume * mix16[*pv->start] ) >> 6;
+                *buffer16bit += ( vol * mix16[*pv->start] ) >> 6;
             }
             else {
                 if ( pv->looping ) {
                     pv->start = pv->repeatStart;
                     pv->end = pv->repeatEnd;
                     if ( pv->start < pv->end ) {
-                        *buffer16bit += ( pv->paula.volume * mix16[*pv->start] ) >> 6;
+                        *buffer16bit += ( vol * mix16[*pv->start] ) >> 6;
                     }
                 }
             }

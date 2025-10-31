@@ -28,17 +28,19 @@ extern "C" {
     /* Delete decoder object. */
     void fc14dec_delete(void* decoder);
 
-    /* Apply input format header check to a memory buffer.
-       Returns: 0 = recognized data, 1 = unknown data */
+    /* Apply input format header check to a memory buffer containing
+       at least 5 (optionally 6 or more) bytes. 
+       Returns: boolean integer 1 = recognized data, 0 = unknown data */
     int fc14dec_detect(void* decoder, void* buffer, unsigned long int length);
 
     /* Initialize decoder with input data from a memory buffer.
        Input buffer may be freed as buffer contents are copied.
-       Returns: 0 = success, 1 = failure */
+       Returns: boolean integer 1 = success, 0 = failure */
     int fc14dec_init(void* decoder, void* buffer, unsigned long int length);
 
-    /* Restart an already initialized decoder. */
-    void fc14dec_restart(void* decoder);
+    /* Restart an already initialized decoder.
+       Returns: boolean integer 1 = success, 0 = not initialized yet */
+    int fc14dec_restart(void* decoder);
 
     /* Initialize decoder's audio sample mixer.
        frequency : output sample frequency
@@ -49,7 +51,7 @@ extern "C" {
     void fc14dec_mixer_init(void* decoder, int frequency, int precision,
                             int channels, int zero);
 
-    /* Return 0 if song end has been reached, else 1. */
+    /* Return 1 (true) if song end has been reached, else 0 (false). */
     int fc14dec_song_end(void* decoder);
 
     /* Return song duration in milli-seconds [ms].
@@ -59,12 +61,22 @@ extern "C" {
     /* Set an initialized decoder's play position in milli-seconds [ms]. */
     void fc14dec_seek(void* decoder, long int ms);
 
-    /* Return C-string describing the detected input data format.
-       Use only with an initialized decoder. */
+    /* Return C-string describing the detected input data format. */
     const char* fc14dec_format_name(void* decoder);
 
     /* Fill output sample buffer with audio. */
     void fc14dec_buffer_fill(void* decoder, void* buffer, unsigned long int length);
+
+#ifdef FC_API_EXT_1
+    void fc14dec_mute_channel(void* ptr, bool mute, unsigned int channel);
+    unsigned short int fc14dec_get_channel_volume(void* ptr, unsigned int channel);
+    int fc14dec_get_used_patterns(void* decoder);
+    int fc14dec_get_used_snd_mod_seqs(void* decoder);
+    int fc14dec_get_used_vol_mod_seqs(void* decoder);
+    int fc14dec_get_sample_length(void* decoder, unsigned int num);
+    int fc14dec_get_sample_rep_offset(void* decoder, unsigned int num);
+    int fc14dec_get_sample_rep_length(void* decoder, unsigned int num);
+#endif
 
 #ifdef __cplusplus
 }

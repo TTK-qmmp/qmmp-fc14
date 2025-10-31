@@ -33,9 +33,18 @@ class FC : public PaulaPlayer {
     bool isOurData(void*,unsigned long int);
     bool init(void*,udword,int=0,int=0);
     void run();
-    void restart(int=0,int=0);
+    bool restart(int=0,int=0);
     void off();
     bool songEnd; // whether song end has been reached
+
+#ifdef FC_API_EXT_1
+    int getUsedPatterns();
+    int getUsedSndModSeqs();
+    int getUsedVolModSeqs();
+    unsigned short getSampleLength(unsigned int num);
+    unsigned short getSampleRepOffset(unsigned int num);
+    unsigned short getSampleRepLength(unsigned int num);
+#endif
 
     bool isSMOD;  // whether file is in Future Composer 1.0 - 1.3 format
     bool isFC14;  // whether file is in Future Composer 1.4 format
@@ -52,6 +61,8 @@ class FC : public PaulaPlayer {
     static const uword FC14_SONGTAB_OFFSET = 0x00b4;      // 180
 
     static const uword TRACKTAB_ENTRY_LENGTH = 0x000d;    // 3*4+1
+    // although this is a constant in FC, it isn't used everywhere
+    // as there are also <<6 shifts in some places of the code
     static const uword PATTERN_LENGTH = 0x0040;           // 32*2
     static const ubyte PATTERN_BREAK = 0x49;
 
@@ -73,6 +84,9 @@ class FC : public PaulaPlayer {
     static const ubyte ENVELOPE_SLIDE = 0xEA;
 
     static const int channels = 4;
+
+    static const int recurseLimit = 64;  // way more than needed
+    int readModRecurse;  // TODO: ought to be private
 
  private:
     PaulaVoice _dummyVoices[channels];
@@ -179,10 +193,14 @@ class FC : public PaulaPlayer {
     void nextNote(CHdata&);
     void processModulation(CHdata&);
     void readModCommand(CHdata&);
+    void readModCommand_recurse(CHdata&);
     void processPerVol(CHdata&);
     inline void setWave(CHdata&, ubyte num);
     inline void readSeqTranspose(CHdata&);
     void volSlide(CHdata&);
+
+    bool havePattern(int n, const ubyte (&pattWanted)[PATTERN_LENGTH]);
+    void replacePattern(int n, const ubyte (&pattNew)[PATTERN_LENGTH]);
 };
 
 #endif  // FC_H

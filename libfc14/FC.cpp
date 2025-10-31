@@ -35,6 +35,9 @@ FC::FC() {
     input = 0;
     inputLen = 0;
     _admin.initialized = false;
+    isFC14 = false;
+    isSMOD = false;
+    formatName = UNKNOWN_FORMAT_NAME;
 
     // Set up some dummy voices to decouple the decoder from the mixer.
     for (int v=0; v<channels; v++) {
@@ -74,10 +77,20 @@ void FC::setMixer(PaulaMixer* mixer) {
 
 
 bool FC::isOurData(void *data, unsigned long int length) {
+    ubyte *d = static_cast<ubyte*>(data);
+    // We only examine the first few bytes.
     if ( length<5 ) {
         return false;
     }
-    ubyte *d = static_cast<ubyte*>(data);
+    if ( length>=6 ) {
+        // Check "track table length" definition. It is stored as a 32-bit value,
+        // but its two uppermost bytes will be 0 always, because no existing
+        // FC module uses as many track table steps as to require more than the
+        // low-order 16-bit value.
+        if ( !(d[4]==0x00 && d[5]==0x00) ) {
+            return false;
+        }
+    }
     // Check for "SMOD" ID (Future Composer 1.0 to 1.3).
     isSMOD = (d[0]==0x53 && d[1]==0x4D && d[2]==0x4F && d[3]==0x44 &&
               d[4]==0x00);
@@ -91,19 +104,20 @@ bool FC::isOurData(void *data, unsigned long int length) {
     // modules are likely to be incompatible in other parts due to incorrect
     // conversion, e.g. effect parameters. It is like creating non-standard
     // module files whose only purpose is to confuse accurate music players.
+    if (isSMOD)
+        formatName = SMOD_FORMAT_NAME;
+    else if (isFC14)
+        formatName = FC14_FORMAT_NAME;
+    else
+        formatName = UNKNOWN_FORMAT_NAME;
     return (isSMOD || isFC14);
 }
 
 
 bool FC::init(void *data, udword length, int startStep, int endStep) {
     if ( !isOurData(data,length) ) {
-        formatName = UNKNOWN_FORMAT_NAME;
         return false;
     }
-    if (isSMOD)
-        formatName = SMOD_FORMAT_NAME;
-    else if (isFC14)
-        formatName = FC14_FORMAT_NAME;
     
     udword copyLen = length+sizeof(silenceData);
     if (copyLen > inputLen) {
@@ -142,6 +156,15 @@ bool FC::init(void *data, udword length, int startStep, int endStep) {
     // This is just for added safety and convenience. One could range-check
     // each pointer/offset where appropriate to avoid segmentation faults
     // caused by damaged input data.
+    //
+    // Smart pointer usage avoids the problem of out-of-bounds access.
+    //
+    // On the topic of rejecting damaged/corrupted input data, over many
+    // years of browsing MOD collections containing Future Composer modules,
+    // no badly corrupted modules have been found. So, if not implementing
+    // pedantic validation of all input data (such as via a dry-run through
+    // the player and watching out for problematic data), only checking
+    // that some offsets are within the module boundaries is not worthwhile.
     
     if (isSMOD) {
         _admin.offsets.trackTable = SMOD_SONGTAB_OFFSET;
@@ -348,13 +371,15 @@ bool FC::init(void *data, udword length, int startStep, int endStep) {
     // (NOTE) The lowest octave in the period table is unreachable
     // due to a hardcoded range-check (see bottom).
     
+#include "LiveFix.h"
+
     return true;
 }
 
 
-void FC::restart(int startStep, int endStep) {
+bool FC::restart(int startStep, int endStep) {
     if (!_admin.initialized) {
-        return;
+        return false;
     }
     // This one later on gets incremented prior to first comparison
     // (4+1=5 => get speed at first step).
@@ -364,7 +389,7 @@ void FC::restart(int startStep, int endStep) {
     // At +4 is length of track table.
     udword trackTabLen = readEndian(fcBuf[4],fcBuf[5],fcBuf[6],fcBuf[7]);
 #if defined(DEBUG)
-    cout << "trackTabLen = " << hex << setw(8) << setfill('0') << trackTabLen << endl;
+    cout << "trackTabLen = 0x" << hex << setw(8) << setfill('0') << trackTabLen << endl;
 #endif
 
     off();
@@ -403,9 +428,19 @@ void FC::restart(int startStep, int endStep) {
         killChannel(_CHdata[c]);
 
         // Track table start and end.
+        // If with custom start/end steps, adjust boundaries.
         _CHdata[c].trackStart = _admin.offsets.trackTable+c*3;
-        _CHdata[c].trackEnd = _CHdata[c].trackStart+trackTabLen;
-        _CHdata[c].trackPos = TRACKTAB_ENTRY_LENGTH*startStep;
+        if ( (startStep>=0) && ((startStep*TRACKTAB_ENTRY_LENGTH)<trackTabLen) ) {
+            _CHdata[c].trackStart += startStep*TRACKTAB_ENTRY_LENGTH;
+        }
+        // a (sub)song's track table end is after the last step to play
+        if ( (endStep>0) && (((endStep)*TRACKTAB_ENTRY_LENGTH)<=trackTabLen) ) {
+            _CHdata[c].trackEnd = _CHdata[c].trackStart+(endStep)*TRACKTAB_ENTRY_LENGTH;
+        }
+        // also the default for endStep=0
+        else {
+            _CHdata[c].trackEnd = _CHdata[c].trackStart+trackTabLen;
+        }
 
         // 4*
         // PT = PATTERN
@@ -429,17 +464,22 @@ void FC::restart(int startStep, int endStep) {
     // This is the wrong speed if a sub-song is selected by skipping steps.
     // 
     // (NOTE) If it is skipped to a step where no replay step is specified,
-    // the default speed is taken. This can be wrong. The only solution
-    // would be to fast-forward the song, i.e. read the speed from all
-    // steps up to the starting step.
+    // go backwards in track table and search for a speed definition.
     //
-    _admin.speed = fcBuf[_CHdata[0].trackStart+_CHdata[0].trackPos+12];
-    if (_admin.speed == 0) {
-        _admin.speed = 3;  // documented default
-    }
+    _admin.speed = 3;  // documented default
+    udword t = _CHdata[0].trackStart+_CHdata[0].trackPos;
+    while (t >= _admin.offsets.trackTable) {
+        ubyte s = fcBuf[t+12];
+        if (s > 0) {
+            _admin.speed = s;
+            break;
+        }
+        t -= TRACKTAB_ENTRY_LENGTH;
+     }
     _admin.count = _admin.speed;
     _admin.isEnabled = true;
     songEnd = false;
+    return true;
 }
     
 // --------------------------------------------------------------------------
@@ -627,10 +667,9 @@ void FC::nextNote(CHdata& CHXdata)
         // Later enable channel.
         _admin.dmaFlags |= CHXdata.dmaMask;
 
-        // Pattern offset stills points to info byte #1.
         // Get instrument/volModSeq number from info byte #1
         // and add sound transpose value from track table.
-        uword sound = (fcBuf[pattOffs]&0x3f)+CHXdata.soundTranspose;
+        uword sound = (info1&0x3f)+CHXdata.soundTranspose;
         //
         // (FC14 BUG-FIX) Better mask here to take care of overflow.
         //
@@ -650,6 +689,11 @@ void FC::nextNote(CHdata& CHXdata)
             seqOffs = _admin.offsets.volModSeqs+(sound<<6);
         }
         CHXdata.envelopeSpeed = CHXdata.envelopeCount = fcBuf[seqOffs++];
+        // (NOTE) Future Composer GUI did not validate modulation sequence
+        // definitions, and the result of an illegal envelope speed of 0
+        // would be implementation dependent and would affect external players.
+        // Handle validation in processPerVol();
+
         // Get sound modulation sequence number.
         sound = fcBuf[seqOffs++];
         CHXdata.vibSpeed = fcBuf[seqOffs++];
@@ -722,6 +766,8 @@ inline void FC::readSeqTranspose(CHdata& CHXdata)
 
 void FC::processModulation(CHdata& CHXdata)
 {
+    // Decrease sustain counter and decide whether to continue
+    // to envelope modulation.
     if (CHXdata.sndModSustainTime != 0)
     {
         --CHXdata.sndModSustainTime;
@@ -733,6 +779,16 @@ void FC::processModulation(CHdata& CHXdata)
 
 void FC::readModCommand(CHdata& CHXdata)
 {
+    readModRecurse = 0;
+    readModCommand_recurse(CHXdata);
+}
+
+void FC::readModCommand_recurse(CHdata& CHXdata)
+{
+    if (++readModRecurse > recurseLimit) {
+        return;
+    }
+
     udword seqOffs = CHXdata.sndSeq+CHXdata.sndSeqPos;
 
     // (NOTE) After each command (except LOOP, END, SUSTAIN,
@@ -748,7 +804,6 @@ void FC::readModCommand(CHdata& CHXdata)
     if (fcBuf[seqOffs] == SNDMOD_END)
     {
         processPerVol(CHXdata);
-        return;
     }
     
     else if (fcBuf[seqOffs] == SNDMOD_SETWAVE)
@@ -767,7 +822,6 @@ void FC::readModCommand(CHdata& CHXdata)
         readSeqTranspose(CHXdata);
         
         processPerVol(CHXdata);
-        return;
     }
 
     else if (fcBuf[seqOffs] == SNDMOD_CHANGEWAVE)
@@ -778,7 +832,6 @@ void FC::readModCommand(CHdata& CHXdata)
         readSeqTranspose(CHXdata);
         
         processPerVol(CHXdata);
-        return;
     }
 
     else if (fcBuf[seqOffs] == SNDMOD_SETPACKWAVE)
@@ -836,7 +889,6 @@ void FC::readModCommand(CHdata& CHXdata)
         readSeqTranspose(CHXdata);
         
         processPerVol(CHXdata);
-        return;
     }
 
     else if (fcBuf[seqOffs] == SNDMOD_NEWSEQ)
@@ -844,9 +896,7 @@ void FC::readModCommand(CHdata& CHXdata)
         uword seq = fcBuf[seqOffs+1];
         CHXdata.sndSeq = _admin.offsets.sndModSeqs+(seq<<6);
         CHXdata.sndSeqPos = 0;
-        // Recursive call (ought to be protected via a counter).
-        readModCommand(CHXdata);
-        return;
+        readModCommand_recurse(CHXdata);
     }
 
     else if (fcBuf[seqOffs] == SNDMOD_SUSTAIN)
@@ -856,9 +906,13 @@ void FC::readModCommand(CHdata& CHXdata)
 
         // Decrease sustain counter and decide whether to continue
         // to envelope modulation.
-        // Recursive call (ought to be protected via a counter).
-        processModulation(CHXdata);
-        return;
+        if (CHXdata.sndModSustainTime != 0)
+        {
+            --CHXdata.sndModSustainTime;
+            processPerVol(CHXdata);
+            return;
+        }
+        readModCommand_recurse(CHXdata);
     }
 
     else if (fcBuf[seqOffs] == SNDMOD_NEWVIB)
@@ -868,7 +922,6 @@ void FC::readModCommand(CHdata& CHXdata)
         CHXdata.sndSeqPos += 3;
         
         processPerVol(CHXdata);
-        return;
     }
 
     else if (fcBuf[seqOffs] == SNDMOD_PITCHBEND)
@@ -880,7 +933,6 @@ void FC::readModCommand(CHdata& CHXdata)
         readSeqTranspose(CHXdata);
     
         processPerVol(CHXdata);
-        return;
     }
 
     else // Not a command, but a transpose value.
@@ -922,6 +974,7 @@ void FC::volSlide(CHdata& CHXdata)
 void FC::processPerVol(CHdata& CHXdata)
 {
     bool repeatVolSeq;  // JUMP/GOTO - WHILE conversion
+    int jumpCount = 0;
     do
     {
         repeatVolSeq = false;
@@ -939,7 +992,9 @@ void FC::processPerVol(CHdata& CHXdata)
         }
 
         // Time to set next volume level? NE => no, EQ => yes.
-        else if (--CHXdata.envelopeCount == 0)
+        // speed==0 is illegal and as a safety measure must not advance the
+        // sequence position.
+        else if ( (CHXdata.envelopeSpeed == 0) || (--CHXdata.envelopeCount == 0) )
         {
             CHXdata.envelopeCount = CHXdata.envelopeSpeed;
 
@@ -947,8 +1002,18 @@ void FC::processPerVol(CHdata& CHXdata)
             do
             {
                 readNextVal = false;
+                if ( ++jumpCount > recurseLimit ) {
+                    break;
+                }
                     
                 udword seqOffs = CHXdata.volSeq+CHXdata.volSeqPos;
+                udword maxSeqOffs = _admin.offsets.volModSeqs+_admin.usedVolModSeqs*64;
+                // Ensure that the volume modulation sequence is within boundaries.
+                // Else loop to beginning automatically as a safety measure.
+                if ( CHXdata.volSeq < maxSeqOffs && seqOffs >= maxSeqOffs ) {
+                    CHXdata.volSeqPos = 0;
+                    seqOffs = CHXdata.volSeq+CHXdata.volSeqPos;
+                }
                 ubyte command = fcBuf[seqOffs];
 
                 switch (command)
@@ -956,6 +1021,10 @@ void FC::processPerVol(CHdata& CHXdata)
                  case ENVELOPE_SUSTAIN:
                     {
                         CHXdata.volSustainTime = fcBuf[seqOffs+1];
+                        // Zero would be illegal.
+                        if ( CHXdata.volSustainTime == 0 ) {
+                            CHXdata.volSustainTime = 1;
+                        }
                         CHXdata.volSeqPos += 2;
                         // This shall loop to beginning of proc.
                         repeatVolSeq = true;
@@ -971,8 +1040,14 @@ void FC::processPerVol(CHdata& CHXdata)
                     }
                  case ENVELOPE_LOOP:
                     {
-                        // Range check should be done here.
-                        CHXdata.volSeqPos = (fcBuf[seqOffs+1]-5)&0x3f;
+                        // Valid position would be 5 to 0x3f.
+                        CHXdata.volSeqPos = fcBuf[seqOffs+1]&0x3f;
+                        // Skip the sequence header.
+                        if ( CHXdata.volSeqPos >= 5 ) {
+                            CHXdata.volSeqPos -= 5;
+                        } else {  // Less than 5 would be an illegal loop pos.
+                            CHXdata.volSeqPos = 0;
+                        }
                         // (FC14 BUG) Some FC players here do not read a
                         // parameter at the new sequence position. They
                         // leave the pos value in d0, which then passes
@@ -988,10 +1063,10 @@ void FC::processPerVol(CHdata& CHXdata)
                     }
                  default:
                     {
-                        // Read volume value and advance.
+                        // Read volume value.
                         CHXdata.volume = fcBuf[seqOffs];
-                        if (++CHXdata.volSeqPos > 0x3f) {
-                            CHXdata.volSeqPos = 0x3f;
+                        if ( CHXdata.envelopeSpeed != 0 ) {
+                            ++CHXdata.volSeqPos;
                         }
                         // Full range check for volume 0-64.
                         if (CHXdata.volume > 64) {
@@ -1163,3 +1238,45 @@ void FC::processPerVol(CHdata& CHXdata)
     }
     CHXdata.period = tmp0;
 }
+
+bool FC::havePattern(int n, const ubyte (&pattWanted)[PATTERN_LENGTH]) {
+    if ( _admin.usedPatterns < n ) {
+        return false;
+    }
+    udword pattStart = _admin.offsets.patterns+(n*PATTERN_LENGTH);
+    if ( (pattStart+n) < inputLen ) {
+        return ( memcmp(input+pattStart,pattWanted,PATTERN_LENGTH) == 0 );
+    }
+    return false;
+}
+
+void FC::replacePattern(int n, const ubyte (&pattNew)[PATTERN_LENGTH]) {
+    udword pattStart = _admin.offsets.patterns+(n*PATTERN_LENGTH);
+    memcpy(input+pattStart,pattNew,PATTERN_LENGTH);
+}
+
+#ifdef FC_API_EXT_1
+int FC::getUsedPatterns() {
+	return _admin.usedPatterns;
+}
+
+int FC::getUsedSndModSeqs() {
+	return _admin.usedSndModSeqs;
+}
+
+int FC::getUsedVolModSeqs() {
+	return _admin.usedVolModSeqs;
+}
+
+unsigned short FC::getSampleLength(unsigned int num) {
+	return _sounds[num].len*2;
+}
+
+unsigned short FC::getSampleRepOffset(unsigned int num) {
+	return _sounds[num].repOffs;
+}
+
+unsigned short FC::getSampleRepLength(unsigned int num) {
+	return _sounds[num].repLen*2;
+}
+#endif
