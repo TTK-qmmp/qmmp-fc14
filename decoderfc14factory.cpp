@@ -6,14 +6,18 @@
 
 bool DecoderFC14Factory::canDecode(QIODevice *input) const
 {
-    const QFile * const file = qobject_cast<QFile*>(input);
-    if(!file)
+    // At least 0xb80 is needed for some modules that start with machine code player.
+    constexpr int peekSize = 0xb80;
+    char buf[peekSize];
+    if(input->peek(buf, peekSize) != peekSize)
     {
         return false;
     }
 
-    FC14Helper helper(file->fileName());
-    return helper.initialize();
+    void *ctx = fc14dec_new();
+    const int v = fc14dec_detect(ctx, buf, peekSize);
+    fc14dec_delete(ctx);
+    return v;
 }
 
 DecoderProperties DecoderFC14Factory::properties() const

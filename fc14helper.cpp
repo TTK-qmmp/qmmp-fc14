@@ -32,12 +32,6 @@ bool FC14Helper::initialize()
     file.close();
 
     m_input = fc14dec_new();
-    if(!fc14dec_detect(m_input, (void*)buffer.constData(), buffer.length()))
-    {
-        qWarning("FC14Helper: fc14dec_detect error");
-        return false;
-    }
-
     if(!fc14dec_init(m_input, (void*)buffer.constData(), buffer.length()))
     {
         qWarning("FC14Helper: fc14dec_init error");

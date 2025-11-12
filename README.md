@@ -1,9 +1,10 @@
 This is a plugin for Qmmp (1.6.0 or greater) which supports FC14 file.
-(Future Composer Audio File)
+[(Future Composer Audio File)](https://github.com/mschwendt/libfc14audiodecoder)
 
 The following packages are required, including development headers,
 which some vendors split into separate packages:
 
+- libfc14audiodecoder (1.0.6)
 - qt4 for qmmp 0.x
 - qt5 for qmmp 1.x
 - qt6 for qmmp 2.x
