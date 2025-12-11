@@ -21,8 +21,6 @@ SOURCES += decoderfc14factory.cpp \
            libfc14/LamePaulaVoice.cpp \
            libfc14/Paula.cpp
 
-INCLUDEPATH += $$PWD/libfc14
-
 DEFINES += LIBFC_VERSION_OLD
 
 #CONFIG += BUILD_PLUGIN_INSIDE
