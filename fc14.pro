@@ -23,6 +23,8 @@ SOURCES += decoderfc14factory.cpp \
 
 INCLUDEPATH += $$PWD/libfc14
 
+DEFINES += LIBFC_VERSION_OLD
+
 #CONFIG += BUILD_PLUGIN_INSIDE
 contains(CONFIG, BUILD_PLUGIN_INSIDE){
     include($$PWD/../../plugins.pri)

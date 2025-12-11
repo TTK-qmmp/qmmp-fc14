@@ -25,7 +25,7 @@ DecoderProperties DecoderFC14Factory::properties() const
     DecoderProperties properties;
     properties.name = tr("FC14 Plugin");
     properties.shortName = "fc14";
-    properties.filters << "*.fc" << "*.fc13" << "*.fc14" << "*.smod";
+    properties.filters << "*.fc" << "*.fc3" << "*.fc4" << "*.fc13" << "*.fc14" << "*.smod";
     properties.description = "Future Composer Audio File";
     properties.protocols << "file";
     properties.noInput = true;
