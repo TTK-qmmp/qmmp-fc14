@@ -95,7 +95,9 @@ void DecoderFC14Factory::showAbout(QWidget *parent)
 {
     QMessageBox::about(parent, tr("About FC14 Reader Plugin"),
                        tr("Qmmp FC14 Reader Plugin") + "\n" +
-                       tr("Written by: Greedysky <greedysky@163.com>"));
+                       tr("Written by: Greedysky <greedysky@163.com>") + "\n" +
+                       tr("Based on the source code from the libfc14audiodecoder") + "\n" +
+                       tr("Written by Michael Schwendt (C) 2024"));
 }
 
 QString DecoderFC14Factory::translation() const
